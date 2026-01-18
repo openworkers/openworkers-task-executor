@@ -87,14 +87,7 @@ task-executor listen \
 }
 ```
 
-Or with inline code:
-
-```json
-{
-  "code": "export default { task: () => ({ hello: 'world' }) }",
-  "payload": {}
-}
-```
+> **Note**: Scripts must exist in the `--root` directory. Nested paths like `"script": "workers/task.js"` are allowed.
 
 ### Database listener (`db-listen`)
 
@@ -218,6 +211,25 @@ task-executor db-listen --database-url $DATABASE_URL
 
 # Both will process tasks without conflicts
 ```
+
+## Testing
+
+```bash
+# Run all tests (requires PostgreSQL for db tests)
+cargo test --features v8,database
+
+# Run only database tests
+cargo test --features v8,database db_
+```
+
+Database tests use `.env.test` for configuration:
+
+```bash
+# .env.test
+DATABASE_URL=postgres://postgres:postgres@localhost/postgres
+```
+
+Tests create isolated tables (`test_tasks_{uuid}`) and clean up automatically.
 
 ## License
 

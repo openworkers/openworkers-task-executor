@@ -238,9 +238,7 @@ async fn listen_nats(
 #[derive(serde::Deserialize)]
 struct TaskMessage {
     /// Path to script file (relative to root)
-    script: Option<String>,
-    /// Inline code to execute
-    code: Option<String>,
+    script: String,
     /// JSON payload for the task
     payload: Option<serde_json::Value>,
     /// Timeout in milliseconds (optional, uses default if not specified)
@@ -260,22 +258,10 @@ async fn handle_nats_message(
     let msg: TaskMessage =
         serde_json::from_slice(payload).map_err(|e| format!("Invalid message format: {}", e))?;
 
-    // Get script content (either from file or inline)
-    let script_content = match (&msg.script, &msg.code) {
-        (Some(script_path), None) => {
-            // Resolve and validate path
-            let resolved = resolve_script_path(root, script_path)?;
-            std::fs::read_to_string(&resolved)
-                .map_err(|e| format!("Failed to read script '{}': {}", script_path, e))?
-        }
-        (None, Some(code)) => code.clone(),
-        (Some(_), Some(_)) => {
-            return Err("Cannot specify both 'script' and 'code'".into());
-        }
-        (None, None) => {
-            return Err("Must specify either 'script' or 'code'".into());
-        }
-    };
+    // Get script content from file
+    let resolved = resolve_script_path(root, &msg.script)?;
+    let script_content = std::fs::read_to_string(&resolved)
+        .map_err(|e| format!("Failed to read script '{}': {}", msg.script, e))?;
 
     let timeout = msg.timeout.unwrap_or(default_timeout);
 

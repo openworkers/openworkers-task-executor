@@ -41,4 +41,5 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # TODO: re-enable linux/arm64 once openworkers-v8 provides prebuilt binaries for aarch64-unknown-linux-gnu
           platforms: linux/amd64

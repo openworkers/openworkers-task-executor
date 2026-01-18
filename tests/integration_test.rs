@@ -1,8 +1,4 @@
 //! Integration tests for the task executor
-//!
-//! These tests require the V8 runtime feature.
-
-#![cfg(feature = "v8")]
 
 use openworkers_core::{Event, RuntimeLimits, Script, TaskSource, WorkerCode};
 use openworkers_task_executor::MinimalOps;

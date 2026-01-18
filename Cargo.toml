@@ -6,8 +6,7 @@ license = "MIT"
 description = "Minimal task executor for OpenWorkers - fetch only, no database"
 
 [features]
-default = ["v8", "nats"]
-v8 = ["dep:openworkers-runtime-v8"]
+default = ["nats"]
 nats = ["dep:async-nats"]
 database = ["dep:sqlx", "dep:dotenvy"]
 
@@ -15,8 +14,8 @@ database = ["dep:sqlx", "dep:dotenvy"]
 # Core types
 openworkers-core = { git = "https://github.com/openworkers/openworkers-core", tag = "v0.9.0" }
 
-# Runtime backend (V8)
-openworkers-runtime-v8 = { git = "https://github.com/openworkers/openworkers-runtime-v8", tag = "v0.9.1", optional = true }
+# Runtime backend (V8) - required
+openworkers-runtime-v8 = { git = "https://github.com/openworkers/openworkers-runtime-v8", tag = "v0.9.1" }
 
 # Async runtime
 tokio = { version = "1.49.0", features = ["full"] }

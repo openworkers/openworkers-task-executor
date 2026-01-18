@@ -12,21 +12,22 @@ Perfect for background jobs, scheduled tasks, or lightweight serverless workload
 
 | Feature | Description | Default |
 |---------|-------------|---------|
-| `v8` | V8 JavaScript runtime | ✅ |
 | `nats` | NATS message queue listener | ✅ |
 | `database` | PostgreSQL queue with pg_notify | ❌ |
+
+> V8 runtime is always included (required).
 
 ## Installation
 
 ```bash
-# Clone and build with default features (v8 + nats)
+# Build with default features (nats)
 cargo build --release
 
 # Build with database support
 cargo build --release --features database
 
 # Build with all features
-cargo build --release --features v8,nats,database
+cargo build --release --features nats,database
 ```
 
 ## Usage
@@ -216,10 +217,10 @@ task-executor db-listen --database-url $DATABASE_URL
 
 ```bash
 # Run all tests (requires PostgreSQL for db tests)
-cargo test --features v8,database
+cargo test --features database
 
 # Run only database tests
-cargo test --features v8,database db_
+cargo test --features database db_
 ```
 
 Database tests use `.env.test` for configuration:

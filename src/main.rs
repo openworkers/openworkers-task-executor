@@ -314,7 +314,6 @@ fn resolve_script_path(root: &PathBuf, script_path: &str) -> Result<PathBuf, Str
 }
 
 /// Execute a script and return the result
-#[cfg(feature = "v8")]
 async fn execute_script(
     script_content: &str,
     payload: Option<serde_json::Value>,
@@ -368,17 +367,6 @@ async fn execute_script(
     }
 }
 
-#[cfg(not(feature = "v8"))]
-async fn execute_script(
-    _script_content: &str,
-    _payload: Option<serde_json::Value>,
-    _origin: &str,
-    _timeout: u64,
-    _quiet: bool,
-) -> Result<openworkers_core::TaskResult, Box<dyn std::error::Error>> {
-    Err("V8 runtime not enabled. Build with --features v8".into())
-}
-
 #[cfg(feature = "database")]
 async fn listen_database(
     database_url: String,
@@ -419,7 +407,8 @@ async fn listen_database(
 }
 
 /// Execute script variant for database listener (needs to be Send)
-#[cfg(all(feature = "database", feature = "v8"))]
+/// Execute script variant for database listener (needs to be Send)
+#[cfg(feature = "database")]
 async fn execute_script_for_db(
     script_content: &str,
     payload: Option<serde_json::Value>,
@@ -478,14 +467,4 @@ async fn execute_script_for_db(
         }
         Err(reason) => Err(format!("Execution failed: {:?}", reason).into()),
     }
-}
-
-#[cfg(all(feature = "database", not(feature = "v8")))]
-async fn execute_script_for_db(
-    _script_content: &str,
-    _payload: Option<serde_json::Value>,
-    _timeout: u64,
-    _quiet: bool,
-) -> Result<openworkers_core::TaskResult, Box<dyn std::error::Error>> {
-    Err("V8 runtime not enabled. Build with --features v8,database".into())
 }

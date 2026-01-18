@@ -10,7 +10,7 @@
 //!
 //! The tests will create and clean up their own tables.
 
-#![cfg(all(feature = "database", feature = "v8"))]
+#![cfg(feature = "database")]
 
 use openworkers_task_executor::db::{DbPool, TaskCompletion};
 use sqlx::Row;

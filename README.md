@@ -122,16 +122,14 @@ Apply this schema to your database (adjust table name as needed):
 ```sql
 CREATE TABLE ow_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    script TEXT,
-    code TEXT,
+    script TEXT NOT NULL,
     payload JSONB,
     status TEXT NOT NULL DEFAULT 'pending',
     result JSONB,
     error TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     started_at TIMESTAMPTZ,
-    completed_at TIMESTAMPTZ,
-    CONSTRAINT valid_source CHECK (script IS NOT NULL OR code IS NOT NULL)
+    completed_at TIMESTAMPTZ
 );
 
 -- Index for efficient pending task lookup
@@ -155,13 +153,13 @@ CREATE TRIGGER ow_task_notify_insert
 #### Inserting Tasks
 
 ```sql
--- From a script file
+-- Script must exist in the --root directory
 INSERT INTO ow_tasks (script, payload)
 VALUES ('hello.js', '{"name": "world"}');
 
--- With inline code
-INSERT INTO ow_tasks (code, payload)
-VALUES ('export default { task: (p) => ({ greeting: "Hello " + p.name }) }', '{"name": "world"}');
+-- Nested paths are allowed
+INSERT INTO ow_tasks (script, payload)
+VALUES ('workers/process.js', '{"data": [1, 2, 3]}');
 ```
 
 #### Task Lifecycle

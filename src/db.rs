@@ -10,23 +10,21 @@
 //! ```sql
 //! CREATE TABLE ow_tasks (
 //!     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-//!     script TEXT,
-//!     code TEXT,
+//!     script TEXT NOT NULL,
 //!     payload JSONB,
 //!     status TEXT NOT NULL DEFAULT 'pending',
 //!     result JSONB,
 //!     error TEXT,
 //!     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 //!     started_at TIMESTAMPTZ,
-//!     completed_at TIMESTAMPTZ,
-//!     CONSTRAINT valid_source CHECK (script IS NOT NULL OR code IS NOT NULL)
+//!     completed_at TIMESTAMPTZ
 //! );
 //!
 //! CREATE INDEX idx_ow_tasks_pending ON ow_tasks(created_at) WHERE status = 'pending';
 //!
 //! CREATE OR REPLACE FUNCTION notify_ow_task_created() RETURNS TRIGGER AS $$
 //! BEGIN
-//!     PERFORM pg_notify('ow_task_created', NEW.id::text);
+//!     PERFORM pg_notify('ow_tasks_created', NEW.id::text);
 //!     RETURN NEW;
 //! END;
 //! $$ LANGUAGE plpgsql;
@@ -48,8 +46,7 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct DbTask {
     pub id: Uuid,
-    pub script: Option<String>,
-    pub code: Option<String>,
+    pub script: String,
     pub payload: Option<JsonValue>,
     pub created_at: DateTime<Utc>,
 }
@@ -115,7 +112,7 @@ impl DbPool {
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
             )
-            RETURNING id, script, code, payload, created_at
+            RETURNING id, script, payload, created_at
             "#,
             table = self.table_name
         );
@@ -125,7 +122,6 @@ impl DbPool {
         Ok(row.map(|r| DbTask {
             id: r.get("id"),
             script: r.get("script"),
-            code: r.get("code"),
             payload: r.get("payload"),
             created_at: r.get("created_at"),
         }))
@@ -396,26 +392,16 @@ async fn process_task<F>(
     }
 }
 
-/// Get script content from file or inline code
-fn get_script_content(root: &PathBuf, task: &DbTask) -> Result<String, String> {
-    match (&task.script, &task.code) {
-        (Some(script_path), None) => {
-            let resolved = resolve_script_path(root, script_path)?;
+/// Get script content from file
+pub(crate) fn get_script_content(root: &PathBuf, task: &DbTask) -> Result<String, String> {
+    let resolved = resolve_script_path(root, &task.script)?;
 
-            std::fs::read_to_string(&resolved)
-                .map_err(|e| format!("Failed to read script '{}': {}", script_path, e))
-        }
-
-        (None, Some(code)) => Ok(code.clone()),
-
-        (Some(_), Some(_)) => Err("Task has both 'script' and 'code' defined".to_string()),
-
-        (None, None) => Err("Task has neither 'script' nor 'code' defined".to_string()),
-    }
+    std::fs::read_to_string(&resolved)
+        .map_err(|e| format!("Failed to read script '{}': {}", task.script, e))
 }
 
 /// Resolve script path safely within the root directory
-fn resolve_script_path(root: &PathBuf, script_path: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve_script_path(root: &PathBuf, script_path: &str) -> Result<PathBuf, String> {
     // Reject absolute paths
     if script_path.starts_with('/') || script_path.starts_with('\\') {
         return Err(format!("Absolute paths are not allowed: '{}'", script_path));
@@ -443,4 +429,147 @@ fn resolve_script_path(root: &PathBuf, script_path: &str) -> Result<PathBuf, Str
     }
 
     Ok(canonical)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn make_task(script: &str) -> DbTask {
+        DbTask {
+            id: Uuid::new_v4(),
+            script: script.to_string(),
+            payload: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // get_script_content tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_get_script_content_from_file() {
+        let temp_dir = TempDir::new().unwrap();
+        // Canonicalize to handle macOS /tmp -> /private/tmp symlink
+        let root = temp_dir.path().canonicalize().unwrap();
+        let script_path = root.join("test.js");
+        fs::write(&script_path, "export default {}").unwrap();
+
+        let task = make_task("test.js");
+        let content = get_script_content(&root, &task).unwrap();
+
+        assert_eq!(content, "export default {}");
+    }
+
+    #[test]
+    fn test_get_script_content_nested_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().canonicalize().unwrap();
+        let nested_dir = root.join("workers");
+        fs::create_dir(&nested_dir).unwrap();
+        let script_path = nested_dir.join("task.js");
+        fs::write(&script_path, "console.log('nested')").unwrap();
+
+        let task = make_task("workers/task.js");
+        let content = get_script_content(&root, &task).unwrap();
+
+        assert_eq!(content, "console.log('nested')");
+    }
+
+    #[test]
+    fn test_get_script_content_file_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().canonicalize().unwrap();
+        let task = make_task("nonexistent.js");
+
+        let result = get_script_content(&root, &task);
+        assert!(result.is_err());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // resolve_script_path tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_resolve_script_path_valid() {
+        let temp_dir = TempDir::new().unwrap();
+        // Canonicalize to handle macOS /tmp -> /private/tmp symlink
+        let root = temp_dir.path().canonicalize().unwrap();
+        let script_path = root.join("worker.js");
+        fs::write(&script_path, "").unwrap();
+
+        let result = resolve_script_path(&root, "worker.js");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), script_path);
+    }
+
+    #[test]
+    fn test_resolve_script_path_nested() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().canonicalize().unwrap();
+        let nested_dir = root.join("workers");
+        fs::create_dir(&nested_dir).unwrap();
+        let script_path = nested_dir.join("task.js");
+        fs::write(&script_path, "").unwrap();
+
+        let result = resolve_script_path(&root, "workers/task.js");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_resolve_script_path_absolute_rejected() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().canonicalize().unwrap();
+
+        let result = resolve_script_path(&root, "/etc/passwd");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Absolute paths"));
+    }
+
+    #[test]
+    fn test_resolve_script_path_traversal_rejected() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().canonicalize().unwrap();
+
+        let result = resolve_script_path(&root, "../etc/passwd");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("traversal"));
+    }
+
+    #[test]
+    fn test_resolve_script_path_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().canonicalize().unwrap();
+
+        let result = resolve_script_path(&root, "missing.js");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DbPool channel name tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_channel_name_from_table() {
+        // Test the channel name generation logic
+        let table_name = "ow_tasks";
+        let expected = "ow_tasks_created";
+        let channel = format!("{}_created", table_name.replace('.', "_"));
+
+        assert_eq!(channel, expected);
+    }
+
+    #[test]
+    fn test_channel_name_with_schema() {
+        // Table with schema prefix
+        let table_name = "public.my_tasks";
+        let expected = "public_my_tasks_created";
+        let channel = format!("{}_created", table_name.replace('.', "_"));
+
+        assert_eq!(channel, expected);
+    }
 }

@@ -10,12 +10,10 @@ Perfect for background jobs, scheduled tasks, or lightweight serverless workload
 
 ## Features
 
-| Feature | Description | Default |
-|---------|-------------|---------|
-| `nats` | NATS message queue listener | ✅ |
-| `database` | PostgreSQL queue with pg_notify | ❌ |
-
-> V8 runtime is always included (required).
+| Feature    | Description                     | Default |
+| ---------- | ------------------------------- | ------- |
+| `nats`     | NATS message queue listener     | ✅      |
+| `database` | PostgreSQL queue with pg_notify | ❌      |
 
 ## Installation
 
@@ -55,14 +53,14 @@ Example script:
 ```javascript
 export default {
   async task(payload) {
-    const response = await fetch('https://api.example.com/data');
+    const response = await fetch("https://api.example.com/data");
     const data = await response.json();
 
     return {
       input: payload,
-      result: data
+      result: data,
     };
-  }
+  },
 };
 ```
 
@@ -83,7 +81,7 @@ task-executor listen \
 ```json
 {
   "script": "hello.js",
-  "payload": {"name": "world"},
+  "payload": { "name": "world" },
   "timeout": 5000
 }
 ```
@@ -104,10 +102,10 @@ task-executor db-listen \
 
 #### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
+| Variable       | Description               | Default    |
+| -------------- | ------------------------- | ---------- |
 | `DATABASE_URL` | PostgreSQL connection URL | (required) |
-| `TASK_TABLE` | Name of the tasks table | `ow_tasks` |
+| `TASK_TABLE`   | Name of the tasks table   | `ow_tasks` |
 
 #### SQL Schema
 
@@ -173,23 +171,23 @@ export default {
     // payload is the JSON payload passed to the task
 
     // Use fetch() for HTTP requests
-    const response = await fetch('https://api.example.com');
+    const response = await fetch("https://api.example.com");
 
     // Return value is stored as the task result
     return {
-      status: 'done',
-      data: await response.json()
+      status: "done",
+      data: await response.json(),
     };
-  }
+  },
 };
 ```
 
 ### Available APIs
 
-| API | Description |
-|-----|-------------|
-| `fetch()` | Standard Fetch API for HTTP requests |
-| `console.log/warn/error` | Logging (printed to stderr) |
+| API                      | Description                          |
+| ------------------------ | ------------------------------------ |
+| `fetch()`                | Standard Fetch API for HTTP requests |
+| `console.log/warn/error` | Logging (printed to stderr)          |
 
 ## Logging
 

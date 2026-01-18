@@ -1,9 +1,11 @@
 //! Database integration tests
 //!
-//! These tests require a PostgreSQL database. Set DATABASE_URL to run them:
+//! These tests require a PostgreSQL database. Either:
+//! - Create a `.env` file with `DATABASE_URL=postgres://...`
+//! - Or set the environment variable directly
 //!
 //! ```bash
-//! DATABASE_URL=postgres://user:pass@localhost/test cargo test --features v8,database db_
+//! cargo test --features v8,database db_
 //! ```
 //!
 //! The tests will create and clean up their own tables.
@@ -14,8 +16,10 @@ use openworkers_task_executor::db::{DbPool, TaskCompletion};
 use sqlx::Row;
 use uuid::Uuid;
 
-/// Get database URL from environment, skip test if not set
+/// Get database URL from environment or .env.test file
 fn get_database_url() -> Option<String> {
+    // Load .env.test for tests (ignore errors if not found)
+    let _ = dotenvy::from_filename(".env.test");
     std::env::var("DATABASE_URL").ok()
 }
 

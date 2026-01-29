@@ -28,6 +28,22 @@ cargo build --release --features database
 cargo build --release --features nats,database
 ```
 
+### V8 Snapshot (Important)
+
+For optimal performance and stability, generate a V8 snapshot before running:
+
+```bash
+cargo run --bin snapshot
+```
+
+This creates a snapshot at `/tmp/openworkers-runtime-snapshot.bin` containing pre-compiled JavaScript APIs (URL, Headers, Request, Response, etc.).
+
+**Without a snapshot:**
+- Slower cold starts (~2-3ms vs ~100µs)
+- APIs are compiled on every request
+
+**Docker:** The Docker image includes the snapshot automatically.
+
 ## Usage
 
 ### One-shot execution (`run`)
@@ -184,10 +200,20 @@ export default {
 
 ### Available APIs
 
-| API                      | Description                          |
-| ------------------------ | ------------------------------------ |
-| `fetch()`                | Standard Fetch API for HTTP requests |
-| `console.log/warn/error` | Logging (printed to stderr)          |
+| API                      | Description                           |
+| ------------------------ | ------------------------------------- |
+| `fetch()`                | Standard Fetch API for HTTP requests  |
+| `Request` / `Response`   | Fetch API request/response classes    |
+| `Headers`                | HTTP headers manipulation             |
+| `URL` / `URLSearchParams`| URL parsing and manipulation          |
+| `TextEncoder/Decoder`    | UTF-8 encoding/decoding               |
+| `atob()` / `btoa()`      | Base64 encoding/decoding              |
+| `crypto.randomUUID()`    | Generate random UUIDs                 |
+| `crypto.getRandomValues` | Cryptographic random values           |
+| `AbortController`        | Request cancellation                  |
+| `Blob` / `FormData`      | Binary data and form handling         |
+| `console.log/warn/error` | Logging (printed to stderr)           |
+| `setTimeout/setInterval` | Timers (within task execution)        |
 
 ## Logging
 

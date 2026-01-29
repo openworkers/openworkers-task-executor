@@ -44,6 +44,8 @@ RUN touch $RUNTIME_SNAPSHOT_PATH
 
 COPY --from=planner /build/recipe.json recipe.json
 
+RUN echo "Building for $TARGETPLATFORM with features $FEATURES"
+
 RUN --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=$CARGO_HOME/git \
     --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=$CARGO_HOME/registry \
     --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=/build/target \
@@ -55,14 +57,32 @@ RUN --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=$CARGO_HOM
 
 COPY . /build
 
+# Build application for target platform
+# 1. Build the snapshot generator for the TARGET platform
+# 2. Run it (via QEMU emulation explicitly) to generate the snapshot.bin
+# 3. Build the final executor which embeds the snapshot.bin
 RUN --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=$CARGO_HOME/git \
     --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=$CARGO_HOME/registry \
     --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=/build/target \
     case "$TARGETPLATFORM" in \
         "linux/arm64") \
+            # Build snapshot generator for target \
+            cargo build --release --features=$FEATURES --bin snapshot --target aarch64-unknown-linux-gnu && \
+            # Generate snapshot (explicitly using qemu-aarch64-static with cross libs) \
+            QEMU_LD_PREFIX=/usr/aarch64-linux-gnu qemu-aarch64-static /build/target/aarch64-unknown-linux-gnu/release/snapshot && \
+            # Build executor \
             cargo build --release --features=$FEATURES --target aarch64-unknown-linux-gnu && \
             mv /build/target/aarch64-unknown-linux-gnu/release/task-executor /build/output ;; \
         "linux/amd64") \
+            # Build snapshot generator for target \
+            cargo build --release --features=$FEATURES --bin snapshot --target x86_64-unknown-linux-gnu && \
+            # Generate snapshot (direct execution on x86_64, qemu on other archs) \
+            if [ "$(uname -m)" = "x86_64" ]; then \
+                /build/target/x86_64-unknown-linux-gnu/release/snapshot; \
+            else \
+                QEMU_LD_PREFIX=/usr/x86_64-linux-gnu qemu-x86_64-static /build/target/x86_64-unknown-linux-gnu/release/snapshot; \
+            fi && \
+            # Build executor \
             cargo build --release --features=$FEATURES --target x86_64-unknown-linux-gnu && \
             mv /build/target/x86_64-unknown-linux-gnu/release/task-executor /build/output ;; \
         *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
@@ -71,5 +91,6 @@ RUN --mount=type=cache,id=cargo-$TARGETPLATFORM,sharing=locked,target=$CARGO_HOM
 FROM common
 
 COPY --from=platform /build/output /usr/local/bin/task-executor
+COPY --from=platform /build/snapshot.bin /build/snapshot.bin
 
 ENTRYPOINT ["/usr/local/bin/task-executor"]

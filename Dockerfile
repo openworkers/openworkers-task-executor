@@ -23,9 +23,12 @@ RUN --mount=type=cache,target=$CARGO_HOME/git \
 
 COPY . .
 
+RUN touch $RUNTIME_SNAPSHOT_PATH
+
 RUN --mount=type=cache,target=$CARGO_HOME/git \
     --mount=type=cache,target=$CARGO_HOME/registry \
     --mount=type=cache,target=/build/target \
+    cargo run --release --features=$FEATURES --bin snapshot && \
     cargo build --release --features=$FEATURES && \
     cp /build/target/release/task-executor /build/output
 
@@ -36,5 +39,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/output /usr/local/bin/task-executor
+COPY --from=builder /build/snapshot.bin /build/snapshot.bin
 
 ENTRYPOINT ["/usr/local/bin/task-executor"]

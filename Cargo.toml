@@ -1,6 +1,6 @@
 [package]
 name = "openworkers-task-executor"
-version = "0.1.0"
+version = "0.11.0"
 edition = "2024"
 license = "MIT"
 description = "Minimal task executor for OpenWorkers - fetch only, no database"
@@ -12,10 +12,10 @@ database = ["dep:sqlx", "dep:dotenvy"]
 
 [dependencies]
 # Core types
-openworkers-core = { git = "https://github.com/openworkers/openworkers-core", tag = "v0.9.0" }
+openworkers-core = { git = "https://github.com/openworkers/openworkers-core", tag = "v0.11.0" }
 
 # Runtime backend (V8) - required
-openworkers-runtime-v8 = { git = "https://github.com/openworkers/openworkers-runtime-v8", tag = "v0.9.1" }
+openworkers-runtime-v8 = { git = "https://github.com/openworkers/openworkers-runtime-v8", tag = "v0.11.2", features = ["ptrcomp"] }
 
 # Async runtime
 tokio = { version = "1.49.0", features = ["full"] }
@@ -53,3 +53,7 @@ tempfile = "3.19"
 [[bin]]
 name = "task-executor"
 path = "src/main.rs"
+
+[[bin]]
+name = "snapshot"
+path = "bin/snapshot.rs"
